@@ -5,15 +5,13 @@ import re
 import ipaddress
 import socket
 import ssl
-import whois
 from urllib.parse import urlparse
-from datetime import datetime
 
-
+# Load the trained model
 with open("XGBoostClassifier.pickle.dat", "rb") as file:
     model = pickle.load(file)
 
-
+# ---------------- Feature Functions ----------------
 
 def havingIP(url):
     try:
@@ -39,14 +37,12 @@ def httpDomain(url):
 
 def tinyURL(url):
     pattern = re.compile(
-        r"bit\.ly|goo\.gl|shorte\.st|go2l\.ink|x\.co|ow\.ly|t\.co|tinyurl|tr\.im|is\.gd|cli\.gs|" \
-                      r"yfrog\.com|migre\.me|ff\.im|tiny\.cc|url4\.eu|twit\.ac|su\.pr|twurl\.nl|snipurl\.com|" \
-                      r"short\.to|BudURL\.com|ping\.fm|post\.ly|Just\.as|bkite\.com|snipr\.com|fic\.kr|loopt\.us|" \
-                      r"doiop\.com|short\.ie|kl\.am|wp\.me|rubyurl\.com|om\.ly|to\.ly|bit\.do|t\.co|lnkd\.in|db\.tt|" \
-                      r"qr\.ae|adf\.ly|goo\.gl|bitly\.com|cur\.lv|tinyurl\.com|ow\.ly|bit\.ly|ity\.im|q\.gs|is\.gd|" \
-                      r"po\.st|bc\.vc|twitthis\.com|u\.to|j\.mp|buzurl\.com|cutt\.us|u\.bb|yourls\.org|x\.co|" \
-                      r"prettylinkpro\.com|scrnch\.me|filoops\.info|vzturl\.com|qr\.net|1url\.com|tweez\.me|v\.gd|" \
-                      r"tr\.im|link\.zip\.net"
+        r"bit\.ly|goo\.gl|shorte\.st|x\.co|ow\.ly|t\.co|tinyurl|tr\.im|is\.gd|cli\.gs|"
+        r"url4\.eu|twit\.ac|su\.pr|twurl\.nl|snipurl\.com|short\.to|BudURL\.com|ping\.fm|"
+        r"post\.ly|Just\.as|bkite\.com|snipr\.com|fic\.kr|loopt\.us|doiop\.com|short\.ie|"
+        r"kl\.am|wp\.me|rubyurl\.com|om\.ly|to\.ly|bit\.do|lnkd\.in|db\.tt|qr\.ae|adf\.ly|"
+        r"bitly\.com|cur\.lv|q\.gs|po\.st|bc\.vc|u\.to|j\.mp|buzurl\.com|cutt\.us|u\.bb|"
+        r"yourls\.org|prettylinkpro\.com|scrnch\.me|filoops\.info|vzturl\.com|qr\.net|1url\.com"
     )
     return 1 if pattern.search(url) else 0
 
@@ -61,38 +57,20 @@ def sslFinalState(url):
         hostname = urlparse(url).netloc
         context = ssl.create_default_context()
         with socket.create_connection((hostname, 443), timeout=3) as sock:
-            with context.wrap_socket(sock, server_hostname=hostname) as ssock:
+            with context.wrap_socket(sock, server_hostname=hostname):
                 return 1
     except:
         return 0
 
-def domainAge(url):
-    try:
-        domain = urlparse(url).netloc
-        w = whois.whois(domain)
-        creation_date = w.creation_date
-        if isinstance(creation_date, list):
-            creation_date = creation_date[0]
-        if creation_date:
-            age = (datetime.now() - creation_date).days
-            return 0 if age < 180 else 1
-        return 0
-    except:
-        return 0
 
-def domainEnd(url):
-    try:
-        domain = urlparse(url).netloc
-        w = whois.whois(domain)
-        expiration_date = w.expiration_date
-        if isinstance(expiration_date, list):
-            expiration_date = expiration_date[0]
-        if expiration_date:
-            days_left = (expiration_date - datetime.now()).days
-            return 0 if days_left < 180 else 1
-        return 0
-    except:
-        return 0
+def domainAge():
+    return 1  
+
+def domainEnd():
+    return 1  
+
+def webTraffic():
+    return 1  
 
 def dnsRecord(url):
     try:
@@ -121,25 +99,24 @@ def extract_features(url):
         prefixSuffix(url),
         subDomain(url),
         sslFinalState(url),
-        domainAge(url),
-        domainEnd(url),
-        1, 
+        domainAge(),     
+        domainEnd(),     
+        webTraffic(),    
         dnsRecord(url),
         iFrame(url),
         mouseOver()
     ]
 
 
-
 st.set_page_config(page_title="Phishing URL Detector", page_icon="🛡️")
-st.title("🔍 Phishing URL Detection with XGBoost")
-url = st.text_input("🔗 Enter a URL")
+st.title("🔍 Phishing URL Detection App")
+url = st.text_input("Enter a URL to check")
 
-if st.button("🚀 Predict"):
+if st.button("Predict"):
     features = np.array([extract_features(url)])
     if features.shape[1] != 16:
-        st.error(f"Expected 16 features, got {features.shape[1]}")
+        st.error("❌ Feature count mismatch.")
     else:
         prediction = model.predict(features)[0]
-        result = "🟢 Legitimate" if prediction == 1 else "🔴 Phishing"
-        st.success(f"### Prediction: **{result}**")
+        result = "🔴 Phishing" if prediction == 0 else "🟢 Legitimate"
+        st.success(f"Prediction: **{result}**")
